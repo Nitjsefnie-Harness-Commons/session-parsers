@@ -22,8 +22,8 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/Nitjsefnie/session-parsers"
-Issues = "https://github.com/Nitjsefnie/session-parsers/issues"
+Homepage = "https://github.com/Nitjsefnie-Harness-Commons/session-parsers"
+Issues = "https://github.com/Nitjsefnie-Harness-Commons/session-parsers/issues"
 
 [project.scripts]
 parse-session = "session_parsers.parse_session:main"
