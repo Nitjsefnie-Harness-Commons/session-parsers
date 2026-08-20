@@ -1,18 +1,33 @@
 # Deny by default; nothing is tracked unless a rule below names it.
 #
 # The usual shape of this file is the opposite -- list the junk, let everything
-# else through -- and that shape only works when you can enumerate the junk in
-# advance. Inverted, a file nobody named simply does not get committed, and
-# adding one to the release is a deliberate line in this file.
+# else through -- and that shape has two failures this one does not. A new kind
+# of file matches no rule and is one reflexive `git add` from the history. And
+# the deny list is itself published: every path it names announces that such a
+# file exists in the working tree, so excluding `PERSONAL.md` by name still
+# tells a reader there is a `PERSONAL.md`.
 #
-# Git will not look inside a directory it has ignored, so each one below is
-# re-opened, its contents denied again, and then named back by glob. That keeps
-# every glob scoped: the `!*.py` under a package can never reach into `build/`
-# or `__pycache__/`, because those are never re-opened.
+# Inverted, a file nobody named does not get committed, and this file describes
+# only what ships.
+#
+# The keep list names FILES, not extensions. A `!/shared/**/*.md` rule would be
+# shorter and would re-admit any note dropped where Markdown legitimately lives,
+# which is nearly every directory here.
+#
+# Git will not look inside a directory it has ignored, so each directory below
+# is re-opened before its files are named back.
+#
+# Regenerate after adding files:
+#   python3 <this script's path> <repo>
+#
+# Forgetting to regenerate does not silently drop a file from the release:
+# install.py walks the payload on disk and refuses to install when it finds a
+# file `git ls-files` does not list.
 
 *
 
-# ─── Root files ───
+
+# ─── root ───
 !/.gitignore
 !/.pylintrc
 !/LICENSE
@@ -23,18 +38,26 @@
 !/run_tests.py
 !/setup.cfg
 
-# ─── .github/workflows/ ───
+# ─── .github/workflows ───
 !/.github/
 !/.github/workflows/
-/.github/workflows/*
-!/.github/workflows/*.yml
+!/.github/workflows/lint.yml
+!/.github/workflows/release.yml
+!/.github/workflows/tests.yml
+!/.github/workflows/types.yml
 
-# ─── session_parsers/ ───
+# ─── session_parsers ───
 !/session_parsers/
-/session_parsers/*
-!/session_parsers/*.py
+!/session_parsers/__init__.py
+!/session_parsers/parse_codex.py
+!/session_parsers/parse_session.py
+!/session_parsers/parse_wire.py
 
-# ─── tests/ ───
+# ─── tests ───
 !/tests/
-/tests/*
-!/tests/*.py
+!/tests/_util.py
+!/tests/test_package_contract.py
+!/tests/test_parse_codex.py
+!/tests/test_parse_session_bg_tasks.py
+!/tests/test_parse_session_costs.py
+!/tests/test_parse_wire.py
