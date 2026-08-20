@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "session-parsers"
+dynamic = ["version"]
+description = "Transcript parsers for Claude Code, Kimi and Codex agent sessions"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{ name = "Nitjsefnie" }]
+keywords = ["claude", "codex", "kimi", "transcript", "parser", "agents"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Debuggers",
+]
+# Stdlib only, deliberately: these run inside hooks on every tool call, and a
+# dependency here would be paid for on every one of them.
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/Nitjsefnie/session-parsers"
+Issues = "https://github.com/Nitjsefnie/session-parsers/issues"
+
+[project.scripts]
+parse-session = "session_parsers.parse_session:main"
+parse-wire = "session_parsers.parse_wire:main"
+parse-codex = "session_parsers.parse_codex:main"
+
+[tool.setuptools]
+packages = ["session_parsers"]
+
+[tool.setuptools.dynamic]
+# Single source of truth: the wheel and the package can never disagree.
+version = { attr = "session_parsers.__version__" }

@@ -1,0 +1,80 @@
+name: tests
+
+# A matrix, because the parsers read paths and decode bytes on all three
+# platforms: Windows spellings of a path, the /var -> /private/var aliasing
+# macOS applies to temp dirs, and UTF-8 vs the ANSI code page all reach this
+# code. Being verified only on whichever box last ran them by hand is the
+# reason these moved out of the bundle at all.
+#
+# No install step: the parsers are stdlib-only on purpose, since they run
+# inside hooks on every tool call.
+
+on:
+  push:
+    # Deny-list rather than an allow-list: a new top-level code directory
+    # would silently stop being tested under an allow-list.
+    paths-ignore:
+      - '**/*.md'
+      - 'LICENSE'
+      - '.gitignore'
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suites:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.11", "3.12", "3.13"]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Run every parser suite
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python run_tests.py
+
+  wheel:
+    # Proves the published artifact, not just the checkout: an import that
+    # resolves only because the source tree is on sys.path would pass the
+    # suites above and still ship a wheel whose commands do not exist.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Build the wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel
+
+      - name: Install it with no checkout in reach and run every command
+        run: |
+          python -m venv "$RUNNER_TEMP/probe"
+          "$RUNNER_TEMP/probe/bin/pip" install dist/*.whl
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/probe/bin/parse-session" --version
+          "$RUNNER_TEMP/probe/bin/parse-wire" --version
+          "$RUNNER_TEMP/probe/bin/parse-codex" --version
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel
+          path: dist/*.whl
