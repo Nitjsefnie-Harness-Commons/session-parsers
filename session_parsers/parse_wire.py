@@ -1014,15 +1014,11 @@ def format_pair(call: dict, result: dict | None,
         err = " [ERROR]" if result.get("is_error") else ""
         if verbose:
             lines.append(
-                f"  └─ RESULT{err} (L{
-                    result['line']}, {
-                    len(detail)} chars):\n{detail}")
+                f"  └─ RESULT{err} (L{result['line']}, {len(detail)} chars):\n{detail}")
         else:
             preview = detail[:300] + ("..." if len(detail) > 300 else "")
             lines.append(
-                f"  └─ RESULT{err} (L{
-                    result['line']}, {
-                    len(detail)} chars): {preview}")
+                f"  └─ RESULT{err} (L{result['line']}, {len(detail)} chars): {preview}")
     else:
         lines.append("  └─ RESULT: (not found)")
     return "\n".join(lines)
@@ -1087,12 +1083,10 @@ def compute_stats(events: list[dict],
     lines.append("=" * 40)
     if first_ts:
         lines.append(
-            f"Start:      {
-                first_ts.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+            f"Start:      {first_ts.strftime('%Y-%m-%d %H:%M:%S UTC')}")
     if last_ts:
         lines.append(
-            f"End:        {
-                last_ts.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+            f"End:        {last_ts.strftime('%Y-%m-%d %H:%M:%S UTC')}")
     if duration:
         lines.append(f"Duration:   {duration}  (wall)")
     lines.append(f"Events:     {len(events)}")
@@ -1244,10 +1238,7 @@ def compute_edits(events: list[dict], verbose: bool = False) -> str:
     ), key=lambda kv: (-kv[1]["count"], -(kv[1]["added"] + kv[1]["removed"])))
     for path, stat in rows:
         lines.append(
-            f"  {
-                stat['count']:>5}  {
-                stat['added']:>7}  {
-                stat['removed']:>7}  {path}")
+            f"  {stat['count']:>5}  {stat['added']:>7}  {stat['removed']:>7}  {path}")
     lines.append("")
     lines.append(f"TOTAL: {total_count} edits across {len(per_file)} files")
     return "\n".join(lines)
@@ -1380,10 +1371,7 @@ def compute_cache(meta_events: list[dict], rates: dict | None = None,
     lines.append(f"  {'TOTAL':<20} ${total_cost:>9.2f}")
     if count:
         lines.append(
-            f"  {
-                'PER TURN':<20} ${
-                total_cost /
-                count:>9.4f}  ({count} turns)")
+            f"  {'PER TURN':<20} ${total_cost / count:>9.4f}  ({count} turns)")
 
     return "\n".join(lines)
 
@@ -1426,13 +1414,7 @@ def compute_context_growth(meta_events: list[dict]) -> str:
     deduped.reverse()
 
     lines.append(
-        f"  {
-            '#':>4}  {
-            'time':<19}  {
-            'L#':>5}  {
-                'input':>10}  {
-                    'output':>8}  {
-                        'delta':>10}"
+        f"  {'#':>4}  {'time':<19}  {'L#':>5}  {'input':>10}  {'output':>8}  {'delta':>10}"
     )
     prev_input = 0
     for idx, t in enumerate(deduped, 1):
@@ -1549,11 +1531,7 @@ def compute_latency(events: list[dict]) -> str:
 
     lines.append("SLOWEST 20 CALLS:")
     lines.append(
-        f"  {
-            'time':<19}  {
-            'L#':>5}  {
-                'dur':>9}  {
-                    'tool':<14}  detail")
+        f"  {'time':<19}  {'L#':>5}  {'dur':>9}  {'tool':<14}  detail")
     for dur, call, result in sorted(all_pairs, key=lambda x: -x[0])[:20]:
         name = call.get("tool_name", "?")
         lines.append(
@@ -1843,15 +1821,7 @@ def compute_turns(events: list[dict], meta_events: list[dict]) -> str:
         return "\n".join(lines)
 
     lines.append(
-        f"  {
-            '#':>4}  {
-            'begin':<19}  {
-            'L_begin':>7}  {
-                'end':<19}  {
-                    'L_end':>7}  {
-                        'steps':>5}  {
-                            'last_input':>10}  {
-                                'last_output':>8}"
+        f"  {'#':>4}  {'begin':<19}  {'L_begin':>7}  {'end':<19}  {'L_end':>7}  {'steps':>5}  {'last_input':>10}  {'last_output':>8}"
     )
     for idx, t in enumerate(turns, 1):
         # Get the last status_update for this turn
@@ -1901,13 +1871,7 @@ def compute_subagents(events: list[dict], meta_events: list[dict]) -> str:
             sub_type = sub_evt.get("type", "?")
             lines.append(
                 f"  L{e['line']:<4} [{short_time(e['ts'])}] "
-                f"agent={
-                    e.get(
-                        'agent_id',
-                        '?')}  type={
-                    e.get(
-                        'subagent_type',
-                        '?')}  "
+                f"agent={e.get('agent_id', '?')}  type={e.get('subagent_type', '?')}  "
                 f"event={sub_type}"
             )
         lines.append("")
@@ -2215,8 +2179,7 @@ def main():
                 wire_path_obj = Path(wire_path)
             elif len(candidates) > 1:
                 print(
-                    f"Ambiguous '{wire_path}' — matches {
-                        len(candidates)} files:",
+                    f"Ambiguous '{wire_path}' — matches {len(candidates)} files:",
                     file=sys.stderr)
                 for c in candidates:
                     print(f"  {c}", file=sys.stderr)
