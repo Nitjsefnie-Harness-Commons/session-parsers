@@ -1,5 +1,40 @@
-__pycache__/
-*.py[cod]
-build/
-dist/
-*.egg-info/
+# Deny by default; nothing is tracked unless a rule below names it.
+#
+# The usual shape of this file is the opposite -- list the junk, let everything
+# else through -- and that shape only works when you can enumerate the junk in
+# advance. Inverted, a file nobody named simply does not get committed, and
+# adding one to the release is a deliberate line in this file.
+#
+# Git will not look inside a directory it has ignored, so each one below is
+# re-opened, its contents denied again, and then named back by glob. That keeps
+# every glob scoped: the `!*.py` under a package can never reach into `build/`
+# or `__pycache__/`, because those are never re-opened.
+
+*
+
+# ─── Root files ───
+!/.gitignore
+!/.pylintrc
+!/LICENSE
+!/README.md
+!/pyproject.toml
+!/pyrightconfig.json
+!/requirements-dev.txt
+!/run_tests.py
+!/setup.cfg
+
+# ─── .github/workflows/ ───
+!/.github/
+!/.github/workflows/
+/.github/workflows/*
+!/.github/workflows/*.yml
+
+# ─── session_parsers/ ───
+!/session_parsers/
+/session_parsers/*
+!/session_parsers/*.py
+
+# ─── tests/ ───
+!/tests/
+/tests/*
+!/tests/*.py
