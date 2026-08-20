@@ -61,7 +61,7 @@ Examples:
     parse_wire.py <wire.jsonl> --path web/browse.py           # all events touching file
 """
 
-__version__ = "1.4.0"
+__version__ = "1.4.1"
 
 import io
 import json
@@ -374,6 +374,12 @@ def _kc_args_to_input(args) -> dict:
 
 def _kc_result_detail(result: object) -> str:
     """Render a kimi-code ExecutableToolResult to a string."""
+    if result is None:
+        # The documented absence, not an unexpected shape: a tool.result with
+        # no `result` key renders empty, exactly like a result carrying no
+        # `output`. Stringifying it would emit the word "None", which reads as
+        # a tool whose output genuinely was that text.
+        return ""
     if not isinstance(result, dict):
         return str(result)
     output = result.get("output")
