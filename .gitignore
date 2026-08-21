@@ -35,14 +35,20 @@
 !/pyproject.toml
 !/pyrightconfig.json
 !/requirements-dev.txt
+!/requirements-test.txt
 !/run_tests.py
 !/setup.cfg
 
 # ─── .github/workflows ───
 !/.github/
 !/.github/workflows/
+!/.github/dependabot.yml
+!/.github/workflows/actionlint.yml
+!/.github/workflows/audit.yml
+!/.github/workflows/codeql.yml
 !/.github/workflows/lint.yml
 !/.github/workflows/release.yml
+!/.github/workflows/tag.yml
 !/.github/workflows/tests.yml
 !/.github/workflows/types.yml
 
