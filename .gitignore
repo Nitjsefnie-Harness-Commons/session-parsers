@@ -65,5 +65,6 @@
 !/tests/test_package_contract.py
 !/tests/test_parse_codex.py
 !/tests/test_parse_session_bg_tasks.py
+!/tests/test_parse_session_reports.py
 !/tests/test_parse_session_costs.py
 !/tests/test_parse_wire.py
