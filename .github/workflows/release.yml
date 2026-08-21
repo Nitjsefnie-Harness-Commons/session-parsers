@@ -23,9 +23,13 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing in this job pushes. Leaving the token in
+          # .git/config lets any later step reuse it.
+          persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
 
@@ -42,12 +46,38 @@ jobs:
 
       - name: Publish checksums beside the wheel
         working-directory: dist
-        run: sha256sum *.whl > SHA256SUMS
+        # `--` so a wheel whose name starts with a dash cannot be read as
+        # an option (shellcheck SC2035).
+        run: sha256sum -- *.whl > SHA256SUMS
 
       - name: Attach the wheel and its checksums to the release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/*.whl
-            dist/SHA256SUMS
-          generate_release_notes: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # `gh`, not a third-party action. This is the one job here holding
+        # contents: write, so every action it runs is code with permission
+        # to publish under this repo's name — and `gh` is preinstalled on
+        # the runner and maintained by GitHub. Dropping the dependency is a
+        # smaller supply chain for the step that needs it least.
+        #
+        # Both branches exist because the two triggers differ: a tag push
+        # creates the release, while a workflow_dispatch rerun finds it
+        # already there and must replace the assets rather than fail.
+        run: |
+          case "$GITHUB_REF" in
+            refs/tags/*) tag="${GITHUB_REF#refs/tags/}" ;;
+            *)
+              echo "Not a tag ref ($GITHUB_REF); nothing to publish." >&2
+              echo "Push a v* tag — .github/workflows/tag.yml does that" >&2
+              echo "automatically when __version__ changes." >&2
+              exit 1
+              ;;
+          esac
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag exists; replacing its assets."
+            gh release upload "$tag" dist/*.whl dist/SHA256SUMS --clobber
+          else
+            gh release create "$tag" --title "$tag" --generate-notes \
+              dist/*.whl dist/SHA256SUMS
+          fi
+          echo "Published $tag."
