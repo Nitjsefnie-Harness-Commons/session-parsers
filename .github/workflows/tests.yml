@@ -20,6 +20,12 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Least privilege: this job only reads the tree. Without an explicit
+# block it inherits the repository default, which can be read/write
+# for the whole token.
+permissions:
+  contents: read
+
 concurrency:
   group: tests-${{ github.ref }}
   cancel-in-progress: true
@@ -35,9 +41,13 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing in this job pushes. Leaving the token in
+          # .git/config lets any later step reuse it.
+          persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python }}
 
@@ -54,9 +64,13 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing in this job pushes. Leaving the token in
+          # .git/config lets any later step reuse it.
+          persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
 
@@ -74,7 +88,86 @@ jobs:
           "$RUNNER_TEMP/probe/bin/parse-wire" --version
           "$RUNNER_TEMP/probe/bin/parse-codex" --version
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: wheel
           path: dist/*.whl
+
+  coverage:
+    # A JOB of its own, not steps inside the matrix above: the matrix is
+    # 3 OSes x 3 Pythons, and coverage of the same code nine times over
+    # tells you the same number nine times. One run, on the newest Python
+    # and the cheapest runner.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-*.txt
+
+      - name: Install the coverage toolchain
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-test.txt
+
+      - name: Measure
+        id: measure
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        # Each suite in its OWN subprocess with --parallel-mode, then
+        # combined — because that is exactly what run_tests.py does, and
+        # measuring a different execution shape than CI actually runs would
+        # report coverage for a program nobody executes. A failing suite
+        # does not fail this job: tests.yml above owns that verdict, and the
+        # gate below is about how much code was reached.
+        run: |
+          shopt -s nullglob
+          suites=(tests/test_*.py)
+          if [ "${#suites[@]}" -eq 0 ]; then
+            echo "no suites found — refusing to report 0% as a pass" >&2
+            exit 1
+          fi
+          for suite in "${suites[@]}"; do
+            echo "::group::$suite"
+            python -m coverage run --parallel-mode --source=session_parsers "$suite" \
+              || echo "  (suite did not pass; its coverage still counts)"
+            echo "::endgroup::"
+          done
+          python -m coverage combine
+
+      - name: Coverage summary
+        # Renders whether or not the gate below passes — a coverage
+        # regression is only actionable if you can see WHICH file lost
+        # lines, and re-reading a scrolled CI log to find that is exactly
+        # the friction that gets a gate disabled.
+        if: ${{ !cancelled() && steps.measure.conclusion == 'success' }}
+        run: |
+          {
+            echo '### Coverage'
+            echo
+            python -m coverage report --format=markdown --precision=1
+          } >> "$GITHUB_STEP_SUMMARY"
+          python -m coverage xml -o coverage.xml
+
+      - name: Upload coverage.xml
+        if: ${{ !cancelled() && steps.measure.conclusion == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: error
+
+      - name: Coverage gate
+        if: ${{ !cancelled() && steps.measure.conclusion == 'success' }}
+        # A RATCHET, not a target. 25 sits just under the 26.6%
+        # measured when this landed, so ordinary churn stays green and a real
+        # regression goes red. Raise the floor by hand as coverage climbs —
+        # never lower it to make a red build green.
+        run: python -m coverage report --fail-under=25 --precision=1
