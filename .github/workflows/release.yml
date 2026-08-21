@@ -36,6 +36,14 @@ jobs:
       - name: Install the build backend
         run: python -m pip install --upgrade pip build
 
+      - name: Install the package and its declared dependencies
+        # For the SUITES below, not for the build: they import the package,
+        # and the moment it has a runtime dependency every one of them dies at
+        # collection with ModuleNotFoundError -- taking the release with it,
+        # before anything is built. tests.yml already installs it here; this
+        # job was the one that diverged.
+        run: pip install .
+
       - name: Run every suite before publishing anything
         env:
           PYTHONDONTWRITEBYTECODE: "1"

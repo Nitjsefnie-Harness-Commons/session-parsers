@@ -9,8 +9,18 @@ name: tag
 # never ships.
 #
 # So this composes with it rather than replacing it: it watches the one file
-# that carries the version, and pushes the tag. release.yml takes over from
-# there and re-runs the suites itself before publishing anything, so the
+# that carries the version, pushes the tag, and then STARTS release.yml by
+# hand. That last part is not belt-and-braces: a `v*` tag pushed with the
+# built-in GITHUB_TOKEN does not trigger release.yml at all. GitHub suppresses
+# workflow runs from token-authored events so a workflow cannot loop on its
+# own pushes, and `workflow_dispatch` is one of the two documented exceptions
+# to that rule -- which is why the last step below dispatches rather than
+# relying on the push.
+#
+# Without it the failure is silent and total: the tag lands, the version looks
+# shipped, no release is ever cut, and nothing goes red.
+#
+# release.yml re-runs the suites itself before publishing anything, so the
 # publish path keeps its own safety net regardless of what happened here.
 #
 # It still waits for the other gates first. A tag is the one artefact that
@@ -53,6 +63,9 @@ jobs:
       contents: write
       # Reading the other workflows' results for this SHA.
       checks: read
+      # Dispatching release.yml. See the last step for why the tag push
+      # cannot do that on its own.
+      actions: write
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -154,10 +167,30 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -a "$TAG" -m "$TAG" "$SHA"
           git push origin "$TAG"
-          echo "Pushed $TAG at $SHA; release.yml takes over from here."
+          echo "Pushed $TAG at $SHA."
           {
             echo "### Tagged \`$TAG\`"
             echo
             echo "Commit \`$SHA\`, after every check on it passed."
             echo "\`release.yml\` builds and publishes the wheel from here."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Start the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          REPO: ${{ github.repository }}
+        # release.yml also triggers on `push: tags: v*`, and that trigger
+        # is what fires for a tag a HUMAN pushes. It does not fire for the
+        # tag the step above just pushed, because that push was
+        # authenticated with GITHUB_TOKEN. Dispatching is the documented
+        # way through, and it composes safely with the push trigger:
+        # release.yml replaces the assets on a release that already exists
+        # rather than failing, so firing twice is not a problem.
+        run: |
+          gh workflow run release.yml --repo "$REPO" --ref "$TAG"
+          echo "Dispatched release.yml against $TAG."
+          {
+            echo "\`release.yml\` dispatched against \`$TAG\`; it builds"
+            echo "and publishes the wheel and its checksums from there."
           } >> "$GITHUB_STEP_SUMMARY"
