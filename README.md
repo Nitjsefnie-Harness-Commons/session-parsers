@@ -50,8 +50,8 @@ python3 -m coverage combine && python3 -m coverage report
 
 Each suite in its own subprocess, because that is what `run_tests.py`
 does — measuring a different execution shape than CI runs would report
-coverage for a program nobody executes. Gated at **25%**, a ratchet
-under the current 26.6%, not a target. Raise it as coverage climbs;
+coverage for a program nobody executes. Gated at **31%**, a ratchet
+under the current 32.9%, not a target. Raise it as coverage climbs;
 never lower it to turn a build green.
 
 ### CI

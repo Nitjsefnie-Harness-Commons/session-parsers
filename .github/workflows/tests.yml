@@ -112,10 +112,17 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-*.txt
 
-      - name: Install the coverage toolchain
+      - name: Install the coverage toolchain and the project
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements-test.txt
+          # `.` too, for the project's own runtime dependencies. Without it a
+          # suite that IMPORTS the package cannot import it at all, every
+          # suite dies on ModuleNotFoundError, and the job goes on to report
+          # the resulting 1% as though it were a measurement. The tests put
+          # the repo root on sys.path themselves, so the source tree is still
+          # what gets measured — this install is here for the deps.
+          python -m pip install .
 
       - name: Measure
         id: measure
@@ -134,12 +141,29 @@ jobs:
             echo "no suites found — refusing to report 0% as a pass" >&2
             exit 1
           fi
+          failed=0
           for suite in "${suites[@]}"; do
             echo "::group::$suite"
-            python -m coverage run --parallel-mode --source=session_parsers "$suite" \
-              || echo "  (suite did not pass; its coverage still counts)"
+            if ! python -m coverage run --parallel-mode --source=session_parsers "$suite"; then
+              echo "  (suite did not pass; its coverage still counts)"
+              failed=$(( failed + 1 ))
+            fi
             echo "::endgroup::"
           done
+
+          # A FAILING suite is fine here — tests.yml above owns that verdict,
+          # and a test that fails still executed the lines it reached. Every
+          # suite failing is a different thing: it means nothing ran, and the
+          # number below would describe no program at all. That is not a low
+          # coverage result to gate on, it is a broken job, and it has
+          # happened — an uninstalled runtime dependency killed every suite at
+          # import and the job reported 1%.
+          if [ "$failed" -eq "${#suites[@]}" ]; then
+            echo "every one of the ${#suites[@]} suites failed — refusing to" >&2
+            echo "report a coverage number for a program that did not run." >&2
+            exit 1
+          fi
+
           python -m coverage combine
 
       - name: Coverage summary
@@ -166,8 +190,8 @@ jobs:
 
       - name: Coverage gate
         if: ${{ !cancelled() && steps.measure.conclusion == 'success' }}
-        # A RATCHET, not a target. 25 sits just under the 26.6%
+        # A RATCHET, not a target. 31 sits just under the 32.9%
         # measured when this landed, so ordinary churn stays green and a real
         # regression goes red. Raise the floor by hand as coverage climbs —
         # never lower it to make a red build green.
-        run: python -m coverage report --fail-under=25 --precision=1
+        run: python -m coverage report --fail-under=31 --precision=1
