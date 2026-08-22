@@ -68,5 +68,6 @@
 !/tests/test_parse_session_extract.py
 !/tests/test_parse_session_latency.py
 !/tests/test_parse_session_reports.py
+!/tests/test_parse_session_reports_extra.py
 !/tests/test_parse_session_costs.py
 !/tests/test_parse_wire.py
