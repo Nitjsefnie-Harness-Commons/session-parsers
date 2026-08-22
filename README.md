@@ -50,9 +50,12 @@ python3 -m coverage combine && python3 -m coverage report
 
 Each suite in its own subprocess, because that is what `run_tests.py`
 does — measuring a different execution shape than CI runs would report
-coverage for a program nobody executes. Gated at **31%**, a ratchet
-under the current 32.9%, not a target. Raise it as coverage climbs;
+coverage for a program nobody executes. Gated at **68%**, a ratchet
+under the current 70.3%, not a target. Raise it as coverage climbs;
 never lower it to turn a build green.
+
+`parse_session.py` is at 93.5%; the remaining gap in this repo is almost
+entirely `parse_wire.py` (46.7%) and `parse_codex.py` (36.9%).
 
 ### CI
 
