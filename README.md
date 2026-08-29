@@ -1,6 +1,6 @@
 # session-parsers
 
-Transcript parsers for Claude Code, Kimi and Codex agent sessions.
+Transcript parsers for Claude Code, Kimi, Codex and Pi agent sessions.
 
 ## Install
 
@@ -19,6 +19,7 @@ pip install ./session_parsers-1.0.1-py3-none-any.whl
 | `parse-session` | Claude Code session JSONL (`~/.claude/projects/<slug>/<uuid>.jsonl`) |
 | `parse-wire` | Kimi `wire.jsonl` |
 | `parse-codex` | Codex rollout JSONL (`~/.codex/sessions/`) |
+| `parse-pi` | Pi session JSONL (`~/.pi/agent/sessions/`) |
 
 Each takes `--help`, and each reports its own version with `--version`.
 

@@ -5,12 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "session-parsers"
 dynamic = ["version"]
-description = "Transcript parsers for Claude Code, Kimi and Codex agent sessions"
+description = "Transcript parsers for Claude Code, Kimi, Codex and Pi agent sessions"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 authors = [{ name = "Nitjsefnie" }]
-keywords = ["claude", "codex", "kimi", "transcript", "parser", "agents"]
+keywords = ["claude", "codex", "kimi", "pi", "transcript", "parser", "agents"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -29,6 +29,7 @@ Issues = "https://github.com/Nitjsefnie-Harness-Commons/session-parsers/issues"
 parse-session = "session_parsers.parse_session:main"
 parse-wire = "session_parsers.parse_wire:main"
 parse-codex = "session_parsers.parse_codex:main"
+parse-pi = "session_parsers.parse_pi:main"
 
 [tool.setuptools]
 packages = ["session_parsers"]
