@@ -17,4 +17,4 @@
 # every repo of this family — collection either errors outright or finds
 # nothing at all. The speed comparator needs --junitxml, which only pytest
 # emits, so there is no timing harness to build the gate on.
-coverage==7.15.4
+coverage==7.16.0
