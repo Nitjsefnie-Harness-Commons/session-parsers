@@ -56,6 +56,7 @@
 !/session_parsers/
 !/session_parsers/__init__.py
 !/session_parsers/parse_codex.py
+!/session_parsers/parse_pi.py
 !/session_parsers/parse_session.py
 !/session_parsers/parse_wire.py
 

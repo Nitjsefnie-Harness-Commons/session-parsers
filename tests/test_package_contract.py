@@ -17,7 +17,7 @@ from pathlib import Path
 import _util
 
 ROOT = Path(_util.SCRIPTS).parent
-MODULES = ("parse_session", "parse_wire", "parse_codex")
+MODULES = ("parse_session", "parse_wire", "parse_codex", "parse_pi")
 
 
 def _run(args):
