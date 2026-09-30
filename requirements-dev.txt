@@ -2,5 +2,5 @@
 # release cannot turn CI red on an unchanged commit. The suites are stdlib
 # only, and so is the package: these parsers declare no runtime dependency.
 pycodestyle==2.14.0
-pylint==4.0.7
+pylint==4.0.9
 pyright==1.1.411
