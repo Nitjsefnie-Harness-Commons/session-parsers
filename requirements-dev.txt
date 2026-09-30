@@ -1,6 +1,6 @@
 # Lint / type toolchain, mirroring the house set. Versions pinned so a tool
 # release cannot turn CI red on an unchanged commit. The suites are stdlib
 # only, and so is the package: these parsers declare no runtime dependency.
-pycodestyle==2.14.0
+pycodestyle==2.15.0
 pylint==4.0.7
 pyright==1.1.411
