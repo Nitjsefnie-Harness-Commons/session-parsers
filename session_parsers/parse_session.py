@@ -116,7 +116,7 @@ Examples:
                                                           # 3 modes, single load
 """
 
-__version__ = "1.33.2"
+__version__ = "1.34.0"
 # Cross-platform: must work on Linux AND Windows. No POSIX-only calls.
 # Bump __version__ (SemVer) on every substantive change. See docs/update_protocol.md.
 
@@ -335,13 +335,24 @@ def _tool_call_detail(event: dict) -> str:
 
 
 def _parse_user_content(content, tool_use_result, line_num: int, ts: str,
-                        rec_uuid: str = "") -> list[dict]:
-    """Events emitted by one user-role record's content field."""
+                        rec_uuid: str = "",
+                        task_delivery: dict | None = None) -> list[dict]:
+    """Events emitted by one user-role record's content field.
+
+    ``task_delivery`` is the record's top-level ``taskDelivery`` object when
+    it carries one (harness-delivered background-task completion,
+    ``origin.kind: task-notification``). It rides on the emitted
+    ``user_message`` event so the bg-task read detector can credit the
+    delivery as a read (issue #383).
+    """
     if isinstance(content, str):
-        return [{
+        ev = {
             "line": line_num, "type": "user_message", "ts": ts, "detail": content,
             "uuid": rec_uuid,
-        }]
+        }
+        if task_delivery is not None:
+            ev["taskDelivery"] = task_delivery
+        return [ev]
     if not isinstance(content, list):
         return []
     out: list[dict] = []
@@ -364,10 +375,13 @@ def _parse_user_content(content, tool_use_result, line_num: int, ts: str,
                 "toolUseResult": tool_use_result,
             })
         elif ctype == "text":
-            out.append({
+            ev = {
                 "line": line_num, "type": "user_message", "ts": ts, "detail": c["text"],
                 "uuid": rec_uuid,
-            })
+            }
+            if task_delivery is not None:
+                ev["taskDelivery"] = task_delivery
+            out.append(ev)
     return out
 
 
@@ -658,7 +672,7 @@ def _process_record_objs(objs, line_num, events, meta_events,
         if role == "user":
             events.extend(_parse_user_content(
                 content, obj.get("toolUseResult"), line_num, ts,
-                obj.get("uuid", "")
+                obj.get("uuid", ""), obj.get("taskDelivery")
             ))
         elif role == "assistant":
             usage = msg.get("usage")
@@ -2286,6 +2300,49 @@ def _new_task_record(
     }
 
 
+def _delivered_bg_text(delivery: dict | None) -> str:
+    """Delivered output text of a harness background-task completion —
+    '' when the delivery carries nothing read-worthy.
+
+    Accepts either delivery shape observed in transcripts (issue #383):
+    the ``taskDelivery`` object of a delivered completion (top-level on a
+    task-notification ``user`` record, or nested under ``attachment`` on a
+    ``queued_command`` attachment record), or the ``toolUseResult`` of an
+    explicit ``GetTask`` call. Both carry
+    ``{taskId, status, result{isError, content[]}}``.
+
+    A delivery counts only with ``status: completed`` and non-empty
+    ``result.content``. ``status: working`` results carry no ``result`` at
+    all, and a completed delivery with empty content carries nothing
+    read-worthy; both return ''. ``result.isError`` is deliberately ignored:
+    for a background COMMAND it means the command exited nonzero, not that
+    the delivery failed — and a failed task's output is the one that most
+    needs reading.
+    """
+    if not isinstance(delivery, dict):
+        return ""
+    if str(delivery.get("status") or "") != "completed":
+        return ""
+    result = delivery.get("result")
+    if not isinstance(result, dict):
+        return ""
+    content = result.get("content")
+    if isinstance(content, str):
+        return content if content.strip() else ""
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, dict):
+                parts.append(str(block.get("text", "")))
+            elif isinstance(block, str):
+                parts.append(block)
+            else:
+                parts.append(json.dumps(block, ensure_ascii=False))
+        text = "\n".join(parts)
+        return text if text.strip() else ""
+    return ""
+
+
 def compute_bg_tasks(events: list[dict], meta_events: list[dict]) -> str:
     """Background shell task lifecycle: launch -> notification -> output read."""
     lines = ["BACKGROUND TASKS", "=" * 40]
@@ -2432,6 +2489,22 @@ def compute_bg_tasks(events: list[dict], meta_events: list[dict]) -> str:
             if task and task["read_ts"] is None:
                 task["read_ts"] = e["ts"]
                 task["read_line"] = e["line"]
+        elif tool == "GetTask":
+            # Explicit model-issued GetTask (issue #383): the harness-native
+            # poll for a background task, keyed by taskId like TaskOutput. A
+            # result with status completed + non-empty result.content IS the
+            # task output — the model read it there. status=working results
+            # carry no result.content yet and do NOT count (nothing read).
+            # result.isError is ignored: for a background command it means
+            # the command exited nonzero, not that the read failed.
+            ti = e.get("tool_input") or {}
+            task = tasks.get(ti.get("taskId") or "")
+            if task:
+                result = e.get("paired_result") or {}
+                if _delivered_bg_text(result.get("toolUseResult")):
+                    if task["read_ts"] is None:
+                        task["read_ts"] = e["ts"]
+                        task["read_line"] = e["line"]
         elif tool in _SHELL_TOOLS:
             cmd = (e.get("tool_input") or {}).get("command", "")
             # Only count commands that read file content, not ls/stat/lsof/wc.
@@ -2451,6 +2524,47 @@ def compute_bg_tasks(events: list[dict], meta_events: list[dict]) -> str:
                 if opath in cmd_norm and task["read_ts"] is None:
                     task["read_ts"] = e["ts"]
                     task["read_line"] = e["line"]
+
+    # Pass 3.5: harness-delivered completions (issue #383). The completion
+    # notification can carry the task's output INLINE as taskDelivery — the
+    # session read it there, whether or not any tool ever opened the .output
+    # file. Two record shapes deliver it: top-level on a task-notification
+    # `user` record (origin.kind: task-notification), and nested under
+    # `attachment` on a queued_command attachment record (mid-turn delivery).
+    # result.isError is ignored: for a background command it means the command
+    # exited nonzero, not that the delivery failed — and a failed task's
+    # output is the one that most needs reading.
+    #
+    # A delivery usually PRECEDES any .output-file read (it arrives with the
+    # notification; a file read after a false "never read" block is a
+    # redundant reread of output the session already had). Pass 3 has already
+    # run by the time we get here, so where both exist the EARLIER
+    # consumption wins the read citation: a delivery rewrites an
+    # already-recorded read only when its timestamp is strictly older. An
+    # empty-timestamp event never wins (it would corrupt the read fields).
+    for e in events:
+        if e.get("type") != "user_message":
+            continue
+        delivery = e.get("taskDelivery")
+        if not isinstance(delivery, dict) or not _delivered_bg_text(delivery):
+            continue
+        task = tasks.get(delivery.get("taskId") or "")
+        if task and e["ts"] and (task["read_ts"] is None or e["ts"] < task["read_ts"]):
+            task["read_ts"] = e["ts"]
+            task["read_line"] = e["line"]
+    for m in meta_events:
+        if m.get("type") != "attachment":
+            continue
+        attach = (m.get("raw") or {}).get("attachment") or {}
+        if str(attach.get("type") or "") != "queued_command":
+            continue
+        delivery = attach.get("taskDelivery")
+        if not isinstance(delivery, dict) or not _delivered_bg_text(delivery):
+            continue
+        task = tasks.get(delivery.get("taskId") or "")
+        if task and m["ts"] and (task["read_ts"] is None or m["ts"] < task["read_ts"]):
+            task["read_ts"] = m["ts"]
+            task["read_line"] = m["line"]
 
     # Notification delivery: a task-notification is "delivered to the agent"
     # once the server has moved it out of the pending queue via any of three

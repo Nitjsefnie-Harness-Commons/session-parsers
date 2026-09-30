@@ -68,6 +68,7 @@
 !/tests/test_parse_pi.py
 !/tests/test_parse_session_cli.py
 !/tests/test_parse_session_bg_tasks.py
+!/tests/test_parse_session_bg_delivery.py
 !/tests/test_parse_session_extract.py
 !/tests/test_parse_session_latency.py
 !/tests/test_parse_session_reports.py
