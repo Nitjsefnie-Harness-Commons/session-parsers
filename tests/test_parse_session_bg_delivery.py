@@ -152,7 +152,8 @@ def _report(tmp, records):
 
 
 def _scenario(tmp, read_record_builder=None):
-    """A full lifecycle: launch -> enqueue -> (optional) read, on real shapes."""
+    """A full lifecycle: launch -> enqueue -> (optional) read, on real shapes.
+    Returns the --bg-tasks report."""
     tid = "bt383aa1"
     out = os.path.join(tmp, f"{tid}.output")
     with open(out, "w", encoding="utf-8") as f:
@@ -162,14 +163,14 @@ def _scenario(tmp, read_record_builder=None):
     if read_record_builder is not None:
         records.extend(read_record_builder(tid, out))
     records.append(_dequeue())
-    return tid, out, _report(tmp, records)
+    return _report(tmp, records)
 
 
 # ---------------------------------------------------------------- tests
 
 
 def test_explicit_gettask_completed_counts_as_read(tmp):
-    tid, _out, report = _scenario(
+    report = _scenario(
         tmp, lambda tid, out: _gettask_call_pair(tid))
     assert "NOTIFIED BUT NEVER READ:" not in report, report
     assert "1 full" in report, report
@@ -180,7 +181,7 @@ def test_explicit_gettask_completed_counts_as_read(tmp):
 def test_explicit_gettask_nonzero_exit_still_counts(tmp):
     # result.isError=true means the background command exited nonzero, not
     # that the delivery failed — the content was still delivered and read.
-    tid, _out, report = _scenario(
+    report = _scenario(
         tmp, lambda tid, out: _gettask_call_pair(tid, is_error=True))
     assert "NOTIFIED BUT NEVER READ:" not in report, report
     assert "1 full" in report, report
@@ -190,7 +191,7 @@ def test_explicit_gettask_nonzero_exit_still_counts(tmp):
 def test_gettask_working_status_is_not_a_read(tmp):
     # status=working results carry no `result` at all (observed shape:
     # "Still running. ... Do not call GetTask again") — nothing read yet.
-    tid, _out, report = _scenario(
+    report = _scenario(
         tmp, lambda tid, out: _gettask_call_pair(tid, status="working",
                                                  include_result=False))
     assert "1 notified-never-read" in report, report
@@ -198,13 +199,13 @@ def test_gettask_working_status_is_not_a_read(tmp):
 
 
 def test_gettask_empty_content_is_not_a_read(tmp):
-    tid, _out, report = _scenario(
+    report = _scenario(
         tmp, lambda tid, out: _gettask_call_pair(tid, text=""))
     assert "1 notified-never-read" in report, report
 
 
 def test_taskdelivery_user_record_counts_as_read(tmp):
-    tid, out, report = _scenario(
+    report = _scenario(
         tmp, lambda tid, out: [
             _taskdelivery_user_record(
                 _task_delivery(tid), tid, out)])
@@ -214,7 +215,7 @@ def test_taskdelivery_user_record_counts_as_read(tmp):
 
 
 def test_taskdelivery_user_record_nonzero_exit_still_counts(tmp):
-    tid, out, report = _scenario(
+    report = _scenario(
         tmp, lambda tid, out: [
             _taskdelivery_user_record(
                 _task_delivery(tid, is_error=True), tid, out)])
@@ -224,7 +225,7 @@ def test_taskdelivery_user_record_nonzero_exit_still_counts(tmp):
 
 
 def test_taskdelivery_user_record_empty_content_is_not_a_read(tmp):
-    tid, out, report = _scenario(
+    report = _scenario(
         tmp, lambda tid, out: [
             _taskdelivery_user_record(
                 _task_delivery(tid, text=""), tid, out)])
@@ -232,7 +233,7 @@ def test_taskdelivery_user_record_empty_content_is_not_a_read(tmp):
 
 
 def test_taskdelivery_attachment_counts_as_read(tmp):
-    tid, _out, report = _scenario(
+    report = _scenario(
         tmp, lambda tid, out: [
             _taskdelivery_attachment_record(_task_delivery(tid))])
     assert "NOTIFIED BUT NEVER READ:" not in report, report
@@ -241,7 +242,7 @@ def test_taskdelivery_attachment_counts_as_read(tmp):
 
 
 def test_taskdelivery_attachment_nonzero_exit_still_counts(tmp):
-    tid, _out, report = _scenario(
+    report = _scenario(
         tmp, lambda tid, out: [
             _taskdelivery_attachment_record(
                 _task_delivery(tid, is_error=True))])
@@ -251,7 +252,7 @@ def test_taskdelivery_attachment_nonzero_exit_still_counts(tmp):
 
 
 def test_taskdelivery_attachment_empty_content_is_not_a_read(tmp):
-    tid, _out, report = _scenario(
+    report = _scenario(
         tmp, lambda tid, out: [
             _taskdelivery_attachment_record(
                 _task_delivery(tid, text=""))])
@@ -260,7 +261,7 @@ def test_taskdelivery_attachment_empty_content_is_not_a_read(tmp):
 
 def test_unread_task_still_flagged(tmp):
     # Control: none of the new paths, no read at all -> still a violation.
-    tid, _out, report = _scenario(tmp)
+    report = _scenario(tmp)
     assert "1 notified-never-read" in report, report
     assert "NOTIFIED BUT NEVER READ:" in report, report
 
@@ -319,7 +320,6 @@ def test_gettask_branch_ignores_nested_is_error_only(tmp):
     out = os.path.join(tmp, f"{tid}.output")
     with open(out, "w", encoding="utf-8") as f:
         f.write("task stdout\n")
-    td = _task_delivery(tid, is_error=True)
     blocked = _gettask_call_pair(tid, is_error=True)
     blocked[1]["message"]["content"][0]["is_error"] = True
     records = _launch_pair(tid, out) + [_enqueue(tid, out)] + blocked + \
