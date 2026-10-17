@@ -2514,14 +2514,23 @@ def compute_bg_tasks(events: list[dict], meta_events: list[dict]) -> str:
             # excluded — they don't read content in a way that counts as "I saw
             # the output." The PowerShell cmdlet forms (Get-Content/gc, Select-
             # String/sls, findstr) count for the same reason their Unix
-            # equivalents do.
+            # equivalents do, and so do interpreters (python, perl, ruby,
+            # node) opening the file from inline code.
             if not re.search(
                 r"\b(cat|head|tail|less|more|grep|rg|awk|sed|jq"
+                r"|python[0-9.]*|perl|ruby|node"
                 r"|Get-Content|gc|Select-String|sls|findstr)\b", cmd, re.IGNORECASE):
                 continue
+            # The task is named either by its resolved output path or by its
+            # id anywhere in the text: a variable-built path (`$T/<id>.output`)
+            # or a loop over ids (`for f in <id> …; do tail $f.output`) never
+            # spells the path out literally.
             cmd_norm = _norm_path(cmd)
             for opath, task in output_file_to_task.items():
-                if opath in cmd_norm and task["read_ts"] is None:
+                named = opath in cmd_norm or (
+                    ".output" in cmd and re.search(
+                        rf"(?<![\w-]){re.escape(task['task_id'])}(?![\w-])", cmd))
+                if named and task["read_ts"] is None:
                     task["read_ts"] = e["ts"]
                     task["read_line"] = e["line"]
 

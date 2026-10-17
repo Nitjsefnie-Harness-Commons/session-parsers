@@ -96,6 +96,19 @@ def test_shell_gitbash_read_counts(tmp):
         assert "1 full" in report, cmd
 
 
+def test_indirect_shell_reads_count(tmp):
+    # #169: a variable-built path, a loop over task ids, and an interpreter
+    # opening the literal path are all reads.
+    out = os.path.join(tmp, "abc123.output")
+    for cmd in (f"T={tmp}; tail -c 900 $T/abc123.output",
+                f"for f in abc123 x; do tail -20 {tmp}/$f.output; done",
+                f"python3 - <<'PY'\nprint(open('{out}').read())\nPY"):
+        report = _report(tmp, _shell(cmd))
+        assert "NOTIFIED BUT NEVER READ:" not in report, cmd
+    report = _report(tmp, _shell("ls abc123.output"))
+    assert "NOTIFIED BUT NEVER READ:" in report
+
+
 def test_unread_task_still_flagged(tmp):
     # Control: with no read event at all the task must still be reported as
     # notified-never-read (i.e. the tests above aren't passing vacuously).
