@@ -2515,9 +2515,11 @@ def compute_bg_tasks(events: list[dict], meta_events: list[dict]) -> str:
             # the output." The PowerShell cmdlet forms (Get-Content/gc, Select-
             # String/sls, findstr) count for the same reason their Unix
             # equivalents do, and so do interpreters (python, perl, ruby,
-            # node) opening the file from inline code.
+            # node) opening the file from inline code. Line and byte
+            # printers (cut, tac, nl, sort, uniq, fold, column, strings, xxd,
+            # od, bat) print content just as head does.
             if not re.search(
-                r"\b(cat|head|tail|less|more|grep|rg|awk|sed|jq"
+                r"\b(cat|head|tail|less|more|grep|rg|awk|sed|jq|cut|tac|nl|sort|uniq|fold|column|strings|xxd|od|bat"
                 r"|python[0-9.]*|perl|ruby|node"
                 r"|Get-Content|gc|Select-String|sls|findstr)\b", cmd, re.IGNORECASE):
                 continue
@@ -3870,7 +3872,7 @@ _REDIRECT_RE = re.compile(
     re.IGNORECASE,
 )
 _INSPECT_CMDS_RE = re.compile(
-    r"\b(cat|head|tail|less|more|grep|rg|awk|sed|jq"
+    r"\b(cat|head|tail|less|more|grep|rg|awk|sed|jq|cut|tac|nl|sort|uniq|fold|column|strings|xxd|od|bat"
     r"|Get-Content|gc|Select-String|sls|findstr)\b", re.IGNORECASE)
 
 

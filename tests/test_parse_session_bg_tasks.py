@@ -105,6 +105,9 @@ def test_indirect_shell_reads_count(tmp):
                 f"python3 - <<'PY'\nprint(open('{out}').read())\nPY"):
         report = _report(tmp, _shell(cmd))
         assert "NOTIFIED BUT NEVER READ:" not in report, cmd
+    # #404: cut prints the content too.
+    report = _report(tmp, _shell(f"cut -c1-900 {out}"))
+    assert "NOTIFIED BUT NEVER READ:" not in report
     report = _report(tmp, _shell("ls abc123.output"))
     assert "NOTIFIED BUT NEVER READ:" in report
 
