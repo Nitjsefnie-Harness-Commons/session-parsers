@@ -12,4 +12,4 @@ them is not pinning the others. The `__version__` here is the DISTRIBUTION's,
 and the only one setuptools reads.
 """
 
-__version__ = "1.2.2"
+__version__ = "1.2.3"
