@@ -6,6 +6,7 @@ Windows-only: the detector skips never-read classification when the output
 file doesn't exist on disk, so the tests need a real file at a drive-letter
 path.
 """
+import json
 import os
 
 import _util
@@ -118,6 +119,35 @@ def test_unread_task_still_flagged(tmp):
     report = _report(tmp, None)
     assert "NOTIFIED BUT NEVER READ:" in report
     assert "1 notified-never-read" in report
+
+
+def test_request_snapshot_copy_of_a_launch_does_not_hide_the_task(tmp):
+    # api-request-blob records replay earlier tool_use blocks with no
+    # timestamp. Taken as events they replaced the real launch in link_pairs
+    # and the task fell out of every bucket.
+    out = os.path.join(tmp, "b1.output")
+    use = {"type": "tool_use", "id": "tu1", "name": "Bash",
+           "input": {"command": "sleep 1", "run_in_background": True}}
+    records = [
+        {"type": "assistant", "timestamp": TS.format(1),
+         "message": {"role": "assistant", "content": [use]}},
+        {"type": "user", "timestamp": TS.format(2), "message": {
+            "role": "user", "content": [{
+                "type": "tool_result", "tool_use_id": "tu1",
+                "content": ("Command running in background with ID: b1. "
+                            f"Output is being written to: {out}.")}]}},
+        {"type": "api-request-blob", "sessionId": "s", "hash": "x",
+         "message": {"role": "assistant", "content": [use]}},
+    ]
+    path = os.path.join(tmp, "session.jsonl")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("".join(json.dumps(r) + "\n" for r in records))
+    events, meta = _PS.extract_events(path)
+    _PS.annotate_parallel(events)
+    _PS.link_pairs(events)
+    report = _PS.compute_bg_tasks(events, meta)
+    assert "Totals: 1 tasks" in report, report
+    assert "1 launched-never-notified" in report, report
 
 
 def main():

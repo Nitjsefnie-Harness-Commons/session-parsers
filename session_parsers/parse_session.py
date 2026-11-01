@@ -182,7 +182,10 @@ def short_time(ts: str) -> str:
 
 
 # Message types to skip outright — noise, no event or meta record emitted.
-_SKIP_MSG_TYPES = {"progress", "file-history-snapshot"}
+# `api-request-blob` is a snapshot of an API request: it replays blocks the
+# transcript already holds, with no timestamp or uuid, so as events the copies
+# would shadow the real tool calls in link_pairs.
+_SKIP_MSG_TYPES = {"progress", "file-history-snapshot", "api-request-blob"}
 
 _LINE_GREP_CHEAT_SHEET = """\
 --line-grep cheat sheet (verified patterns per mode)

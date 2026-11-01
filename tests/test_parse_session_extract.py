@@ -1249,6 +1249,64 @@ def test_format_and_label_agree_on_a_transcript_parsed_end_to_end(tmp):
     assert _PS._event_side_label(calls[1]["paired_result"]) == "RESULT Read"
 
 
+def _blob_rec(role, content, usage=None):
+    msg = {"role": role, "content": content}
+    if usage is not None:
+        msg["usage"] = usage
+    return {"type": "api-request-blob", "sessionId": "s1", "hash": "h",
+            "message": msg}
+
+
+def test_api_request_blob_records_add_no_events_and_change_none(tmp):
+    # A blob is a snapshot of an API request: it replays blocks the transcript
+    # already holds, carries no timestamp and no uuid, and is not itself a
+    # transcript event.
+    use = {"type": "tool_use", "id": "t1", "name": "Bash",
+           "input": {"command": "echo alpha"}}
+    think = {"type": "thinking", "thinking": "plan"}
+    said = {"type": "text", "text": "running it"}
+    usage = {"input_tokens": 10, "output_tokens": 5}
+    real = [
+        _user_rec("go", "u1", 1),
+        _assistant_rec([think, said, use], "a1", 2, usage=usage),
+        _result_rec("t1", "alpha", "r1", 3),
+        _assistant_rec([{"type": "text", "text": "done"}], "a2", 4,
+                       usage=usage, request_id="req2"),
+    ]
+    blobs = [
+        _blob_rec("assistant", [use], usage=usage),
+        _blob_rec("user", [{"type": "tool_result", "tool_use_id": "t1",
+                            "content": "alpha"}]),
+        _blob_rec("assistant", [think, said]),
+        _blob_rec("system", [{"type": "text", "text": "be brief"}]),
+        _blob_rec("system", "be brief"),
+    ]
+    mixed = [blobs[0], real[0], blobs[1], real[1], blobs[2], real[2],
+             blobs[3], real[3], blobs[4]]
+    # 1-based line, inside `mixed`, of each real record.
+    real_lines = [i for i, rec in enumerate(mixed, 1)
+                  if rec["type"] != "api-request-blob"]
+
+    base_events, base_meta = _PS.extract_events(
+        _write(tmp, "real.jsonl", real))
+    events, meta = _PS.extract_events(_write(tmp, "mixed.jsonl", mixed))
+
+    assert _types(base_events) == [
+        "user_message", "thinking", "assistant_text", "tool_call",
+        "tool_result", "assistant_text"]
+    assert [m["type"] for m in base_meta] == ["assistant_usage"] * 2
+
+    def comparable(evs, line_of=lambda n: n):
+        # `src` is the file path, which differs by construction.
+        return [dict(e, line=line_of(e["line"]), src="") for e in evs]
+
+    def to_mixed(n):
+        return real_lines[n - 1]
+
+    assert comparable(events) == comparable(base_events, to_mixed)
+    assert comparable(meta) == comparable(base_meta, to_mixed)
+
+
 def main():
     return _util.runner(_util.collect(globals()), tmp_prefix="extract_")
 
